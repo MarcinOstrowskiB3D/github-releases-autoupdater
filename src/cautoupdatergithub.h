@@ -1,14 +1,9 @@
 #pragma once
-
-#include "../cpp-template-utils/compiler/compiler_warnings_control.h"
-
-DISABLE_COMPILER_WARNINGS
 #include <QFile>
 #include <QNetworkAccessManager>
 #include <QString>
 #include <QJsonDocument>
 #include <QJsonObject>
-RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 #include <vector>
