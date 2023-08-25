@@ -113,6 +113,12 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 		return;
 	}
 
+	if (jsonDocument.isNull() || jsonDocument.isEmpty()) {
+		if (_listener)
+			_listener->onUpdateError("Failed to read data from update server. No processing data!");
+		return;
+	}
+
 	//qDebug() << jsonDocument.object();
 
 	auto parseReleaseJsonObject = [currVersion=_currentVersionString, &changelog](const QJsonObject & object){
