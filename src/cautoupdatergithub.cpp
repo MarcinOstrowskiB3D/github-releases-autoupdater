@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <qjsonarray.h>
 
 #include <assert.h>
 #include <utility>
@@ -102,28 +103,67 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 	}
 
 	ChangeLog changelog;
-	const auto releases = QString(reply->readAll());
-	const QJsonDocument jsonDocument = QJsonDocument::fromJson(releases.toUtf8());
-	const QJsonObject json = jsonDocument.object();
 
-	// Skipping the 0 item because anything before the first "release-header" is not a release
-	for (qsizetype releaseIndex = 1, numItems = releases.size(); releaseIndex < numItems; ++releaseIndex)
-	{
-		QString updateVersion = json["tag_name"].toString();
-		QString url = json["assets"][0]["browser_download_url"].toString();
-		QString releaseUrl = json["html_url"].toString(); // Fallback incase there is no download link available
+	QJsonParseError jsonError;
+	const QJsonDocument jsonDocument = QJsonDocument::fromJson(reply->readAll(),&jsonError);
+	if (jsonError.error != QJsonParseError::NoError) {
+		if (_listener)
+			_listener->onUpdateError("Failed to parse json data");
+
+		return;
+	}
+
+	//qDebug() << jsonDocument.object();
+
+	auto parseReleaseJsonObject = [currVersion=_currentVersionString, &changelog](const QJsonObject & object){
+		QString updateVersion = object["tag_name"].toString();
+
+		// found properly update file extension:
+		auto assetsObject = object["assets"];
+
+		QJsonArray assetsJsonArray;
+		if (assetsObject.isArray()) {
+			assetsJsonArray = assetsObject.toArray();
+		}
+		else {
+			assetsJsonArray = QJsonArray({ assetsObject.toObject() });
+		}
+
+		QString url;
+		for (const auto& asset : assetsJsonArray) {
+			auto browserUrl = asset.toObject()["browser_download_url"].toString();
+			if (browserUrl.lastIndexOf(UPDATE_FILE_EXTENSION) == 0) {
+				url = browserUrl;
+			}
+		}
+
+		QString releaseUrl = object["html_url"].toString(); // Fallback incase there is no download link available
 
 		if (updateVersion.startsWith(QStringLiteral(".v")))
-			updateVersion.remove(0, 2);
+			updateVersion = updateVersion.remove(0, 2);
 		else if (updateVersion.startsWith('v'))
-			updateVersion.remove(0, 1);
+			updateVersion = updateVersion.remove(0, 1);
+		else if (updateVersion.startsWith('#'))
+			updateVersion = updateVersion.remove(0, 1);
 
-		if (!naturalSortQstringComparator(_currentVersionString, updateVersion))
-			continue; // version <= _currentVersionString, skipping
+		if (!naturalSortQstringComparator(currVersion, updateVersion))
+			return;
 
-		const QString updateChanges = json["body"].toString();
+		const QString updateChanges = object["body"].toString();
 
 		changelog.push_back({ updateVersion, updateChanges, !url.isEmpty() ? url : releaseUrl });
+	};
+
+	if (jsonDocument.isArray()) {
+		auto jsonArray = jsonDocument.array();
+
+		// Skipping the 0 item because anything before the first "release-header" is not a release. Ignore skipping when jsonDocument hasn't array.
+		for (qsizetype releaseIndex = 0, numItems = jsonArray.size(); releaseIndex < numItems; ++releaseIndex) {
+			parseReleaseJsonObject(jsonArray.at(releaseIndex).toObject());
+		}
+	}
+	else {
+		parseReleaseJsonObject(jsonDocument.object());
 	}
 
 	if (_listener)
