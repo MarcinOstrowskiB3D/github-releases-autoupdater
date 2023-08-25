@@ -1,6 +1,4 @@
 #include "cupdaterdialog.h"
-
-DISABLE_COMPILER_WARNINGS
 #include "ui_cupdaterdialog.h"
 
 #include <QDebug>
@@ -8,7 +6,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStringBuilder>
-RESTORE_COMPILER_WARNINGS
 
 CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, const QString& versionString, bool silentCheck) :
 	QDialog(parent),
@@ -23,7 +20,7 @@ CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, c
 
 	connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 	connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &CUpdaterDialog::applyUpdate);
-	ui->buttonBox->button(QDialogButtonBox::Ok)->setText("Install");
+	ui->buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Install"));
 
 	ui->stackedWidget->setCurrentIndex(0);
 	ui->progressBar->setMaximum(0);
@@ -47,7 +44,7 @@ void CUpdaterDialog::applyUpdate()
 		ui->progressBar->setMaximum(100);
 		ui->progressBar->setValue(0);
 		ui->lblPercentage->setVisible(true);
-		ui->lblOperationInProgress->setText("Downloading the update...");
+		ui->lblOperationInProgress->setText(tr("Downloading the update..."));
 		ui->stackedWidget->setCurrentIndex(0);
 
 		_updater.downloadAndInstallUpdate(_latestUpdateUrl);
