@@ -20,9 +20,11 @@ static const auto naturalSortQstringComparator = [](const QString& l, const QStr
 	return collator.compare(qToStringViewIgnoringNull(l), qToStringViewIgnoringNull(r)) < 0;
 };
 
-CAutoUpdaterGithub::CAutoUpdaterGithub(QString githubRepositoryName, QString currentVersionString, const std::function<bool (const QString&, const QString&)>& versionStringComparatorLessThan) :
+CAutoUpdaterGithub::CAutoUpdaterGithub(QString githubRepositoryName, QString currentVersionString, QString fileNameTag, QString accessToken, const std::function<bool (const QString&, const QString&)>& versionStringComparatorLessThan) :
 	_repoName(std::move(githubRepositoryName)),
 	_currentVersionString(std::move(currentVersionString)),
+	_fileNameTag(std::move(fileNameTag)),
+	_accessToken(accessToken),
 	_lessThanVersionStringComparator(versionStringComparatorLessThan ? versionStringComparatorLessThan : naturalSortQstringComparator)
 {
 	assert(_repoName.count(QChar('/')) == 1);
@@ -34,11 +36,17 @@ void CAutoUpdaterGithub::setUpdateStatusListener(UpdateStatusListener* listener)
 	_listener = listener;
 }
 
-void CAutoUpdaterGithub::checkForUpdates()
-{
+void CAutoUpdaterGithub::checkForUpdates() {
 	QNetworkRequest request;
-	request.setUrl(QUrl("https://api.github.com/repos/" + _repoName));
+	request.setUrl(QUrl(QString(RepoUrl.data()) + _repoName));
 	request.setRawHeader("Accept", "application/vnd.github+json");
+
+	// set access token if enabled:
+	if (!_accessToken.isEmpty()) {
+		QString tokenValue = "token " + _accessToken;
+		request.setRawHeader("Authorization", tokenValue.toUtf8());
+	}
+	
 	QNetworkReply * reply = _networkManager.get(request);
 	if (!reply)
 	{
@@ -50,11 +58,11 @@ void CAutoUpdaterGithub::checkForUpdates()
 	connect(reply, &QNetworkReply::finished, this, &CAutoUpdaterGithub::updateCheckRequestFinished, Qt::UniqueConnection);
 }
 
-void CAutoUpdaterGithub::downloadAndInstallUpdate(const QString& updateUrl)
+void CAutoUpdaterGithub::downloadAndInstallUpdate(const QString& updateUrl, const QString& filename)
 {
 	assert(!_downloadedBinaryFile.isOpen());
 
-	_downloadedBinaryFile.setFileName(QDir::tempPath() + '/' + QCoreApplication::applicationName() + UPDATE_FILE_EXTENSION);
+	_downloadedBinaryFile.setFileName(QDir::tempPath() + '/' + filename);
 	if (!_downloadedBinaryFile.open(QFile::WriteOnly))
 	{
 		if (_listener)
@@ -63,6 +71,14 @@ void CAutoUpdaterGithub::downloadAndInstallUpdate(const QString& updateUrl)
 	}
 
 	QNetworkRequest request((QUrl(updateUrl)));
+
+	// set access token if enabled:
+	if (!_accessToken.isEmpty()) {
+		QString tokenValue = "token " + _accessToken;
+		request.setRawHeader("Authorization", tokenValue.toUtf8());
+	}
+	
+	request.setRawHeader("Accept", "application/octet-stream");
 	request.setSslConfiguration(QSslConfiguration::defaultConfiguration()); // HTTPS
 	request.setMaximumRedirectsAllowed(5);
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -121,7 +137,7 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 
 	//qDebug() << jsonDocument.object();
 
-	auto parseReleaseJsonObject = [currVersion=_currentVersionString, &changelog](const QJsonObject & object){
+	auto parseReleaseJsonObject = [&](const QJsonObject & object){
 		QString updateVersion = object["tag_name"].toString();
 
 		// found properly update file extension:
@@ -135,29 +151,60 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 			assetsJsonArray = QJsonArray({ assetsObject.toObject() });
 		}
 
-		QString url;
+		QUrl url;
+		QString filename;
+
 		for (const auto& asset : assetsJsonArray) {
-			auto browserUrl = asset.toObject()["browser_download_url"].toString();
-			if (browserUrl.lastIndexOf(UPDATE_FILE_EXTENSION) == 0) {
-				url = browserUrl;
+			// Get binaries with only valid extension.
+			auto assetObject = asset.toObject();
+
+			auto browserUrl = assetObject["browser_download_url"].toString();
+			filename = QUrl(browserUrl).fileName();
+
+			if (filename.indexOf(UPDATE_FILE_EXTENSION) < 0) {
+				continue;
 			}
+
+			// Get binaries with only valid filename.
+			if (!_fileNameTag.isEmpty() && filename.indexOf(_fileNameTag) < 0) {
+				continue;
+			}
+
+			// Generate url link:	
+			const auto assetIdUrl = QVariant(assetObject["id"].toInt()).toString();
+
+			url = QString(RepoUrl.data())
+				.append(_repoName)
+				.append("/")
+				.append("assets")
+				.append("/")
+				.append(assetIdUrl);
+
+			break;
 		}
 
-		QString releaseUrl = object["html_url"].toString(); // Fallback incase there is no download link available
+		//QString releaseUrl = object["html_url"].toString(); // Fallback incase there is no download link available
 
-		if (updateVersion.startsWith(QStringLiteral(".v")))
+		if (updateVersion.startsWith(QStringLiteral(".v"))) {
 			updateVersion = updateVersion.remove(0, 2);
-		else if (updateVersion.startsWith('v'))
+		}
+		else if (updateVersion.startsWith('v')) {
 			updateVersion = updateVersion.remove(0, 1);
-		else if (updateVersion.startsWith('#'))
+		}
+		if (updateVersion.startsWith('#')) {
 			updateVersion = updateVersion.remove(0, 1);
+		}
 
-		if (!naturalSortQstringComparator(currVersion, updateVersion))
+		if (!naturalSortQstringComparator(_currentVersionString, updateVersion)) {
 			return;
+		}
+
+		if (url.isEmpty()) {
+			return;
+		}
 
 		const QString updateChanges = object["body"].toString();
-
-		changelog.push_back({ updateVersion, updateChanges, !url.isEmpty() ? url : releaseUrl });
+		changelog.push_back({ updateVersion, updateChanges, /*!url.isEmpty() ? url : releaseUrl*/ url.toString(), filename });
 	};
 
 	if (jsonDocument.isArray()) {
@@ -181,12 +228,14 @@ void CAutoUpdaterGithub::updateDownloaded()
 	_downloadedBinaryFile.close();
 
 	auto* reply = qobject_cast<QNetworkReply *>(sender());
-	if (!reply)
+	if (!reply) 
+	{
 		return;
+	}
 
 	reply->deleteLater();
 
-	if (reply->error() != QNetworkReply::NoError)
+	if (reply->error() != QNetworkReply::NoError) 
 	{
 		if (_listener)
 			_listener->onUpdateError(reply->errorString());
@@ -194,17 +243,26 @@ void CAutoUpdaterGithub::updateDownloaded()
 		return;
 	}
 
-	if (_listener)
+	if (_listener) 
+	{
 		_listener->onUpdateDownloadFinished();
+	}
 
 	if (!UpdateInstaller::install(_downloadedBinaryFile.fileName()) && _listener)
+	{
 		_listener->onUpdateError("Failed to launch the downloaded update.");
+	}
+	else {
+		exit(EXIT_SUCCESS); // force close program after successfully update installer launch
+	}
 }
 
 void CAutoUpdaterGithub::onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal)
 {
 	if (_listener)
+	{
 		_listener->onUpdateDownloadProgress(bytesReceived < bytesTotal ? static_cast<float>(bytesReceived * 100) / static_cast<float>(bytesTotal) : 100.0f);
+	}
 }
 
 void CAutoUpdaterGithub::onNewDataDownloaded()

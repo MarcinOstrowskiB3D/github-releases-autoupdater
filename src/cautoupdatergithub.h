@@ -25,6 +25,7 @@ public:
 		QString versionString;
 		QString versionChanges;
 		QString versionUpdateUrl;
+		QString versionUpdateFilename;
 	};
 
 	using ChangeLog = std::vector<VersionEntry>;
@@ -42,6 +43,8 @@ public:
 	// If the string comparison functior is not supplied, case-insensitive natural sorting is used (using QCollator)
 	CAutoUpdaterGithub(QString githubRepositoryName, // Name of the repo, e. g. VioletGiraffe/github-releases-autoupdater
 					   QString currentVersionString,
+					   QString fileNameTag = "", // Name of the file, e. g. Banach3DScanner-Installer -> Banach3DScanner-Installer.exe
+					   QString accessToken = "",
 					   const std::function<bool (const QString&, const QString&)>& versionStringComparatorLessThan = {});
 
 	CAutoUpdaterGithub& operator=(const CAutoUpdaterGithub& other) = delete;
@@ -49,7 +52,7 @@ public:
 	void setUpdateStatusListener(UpdateStatusListener* listener);
 
 	void checkForUpdates();
-	void downloadAndInstallUpdate(const QString& updateUrl);
+	void downloadAndInstallUpdate(const QString& updateUrl, const QString& filename);
 
 private:
 	void updateCheckRequestFinished();
@@ -59,9 +62,13 @@ private:
 
 private:
 	QFile _downloadedBinaryFile;
+	const QString _fileNameTag;
+	const QString _accessToken;
 	const QString _repoName;
 	const QString _currentVersionString;
 	const std::function<bool (const QString&, const QString&)> _lessThanVersionStringComparator;
+
+	static constexpr std::string_view RepoUrl = "https://api.github.com/repos/";
 
 	UpdateStatusListener* _listener = nullptr;
 

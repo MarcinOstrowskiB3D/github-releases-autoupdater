@@ -16,6 +16,8 @@ public:
 	explicit CUpdaterDialog(QWidget *parent,
 							const QString& githubRepoName, // Name of the repo, e. g. VioletGiraffe/github-releases-autoupdater
 							const QString& versionString,
+							const QString fileNameTag = "",
+							const QString accessToken = "",
 							bool silentCheck = false);
 	~CUpdaterDialog() override;
 
@@ -35,6 +37,7 @@ private:
 	const bool _silent;
 
 	QString _latestUpdateUrl;
+	QString _latestUpdateFilename;
 	CAutoUpdaterGithub _updater;
 };
 

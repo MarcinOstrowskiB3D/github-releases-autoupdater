@@ -4,5 +4,6 @@
 
 bool UpdateInstaller::install(const QString& downloadedUpdateFilePath)
 {
-	return QProcess::startDetached('\"' + downloadedUpdateFilePath + '\"', {});
+	auto result = QProcess::startDetached('\"' + downloadedUpdateFilePath + '\"', {});
+	return result;
 }

@@ -7,11 +7,11 @@
 #include <QPushButton>
 #include <QStringBuilder>
 
-CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, const QString& versionString, bool silentCheck) :
+CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, const QString& versionString, const QString fileNameTag, const QString accessToken, bool silentCheck) :
 	QDialog(parent),
 	ui(new Ui::CUpdaterDialog),
 	_silent(silentCheck),
-	_updater(githubRepoName, versionString)
+	_updater(githubRepoName, versionString, fileNameTag, accessToken)
 {
 	ui->setupUi(this);
 
@@ -26,6 +26,7 @@ CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, c
 	ui->progressBar->setMaximum(0);
 	ui->progressBar->setValue(0);
 	ui->lblPercentage->setVisible(false);
+	ui->changeLogViewer->setWordWrapMode(QTextOption::WrapMode::WordWrap);
 
 	_updater.setUpdateStatusListener(this);
 	_updater.checkForUpdates();
@@ -39,7 +40,7 @@ CUpdaterDialog::~CUpdaterDialog()
 void CUpdaterDialog::applyUpdate()
 {
 #ifdef _WIN32
-	if (_latestUpdateUrl.endsWith(UPDATE_FILE_EXTENSION))
+	if (_latestUpdateFilename.endsWith(UPDATE_FILE_EXTENSION))
 	{
 		ui->progressBar->setMaximum(100);
 		ui->progressBar->setValue(0);
@@ -47,7 +48,7 @@ void CUpdaterDialog::applyUpdate()
 		ui->lblOperationInProgress->setText(tr("Downloading the update..."));
 		ui->stackedWidget->setCurrentIndex(0);
 
-		_updater.downloadAndInstallUpdate(_latestUpdateUrl);
+		_updater.downloadAndInstallUpdate(_latestUpdateUrl, _latestUpdateFilename);
 	} else {
 		QDesktopServices::openUrl(QUrl(_latestUpdateUrl));
 		accept();
@@ -65,16 +66,25 @@ void CUpdaterDialog::applyUpdate()
 #endif
 }
 
-// If no updates are found, the changelog is empty
+// If no updates are found, the change log is empty
 void CUpdaterDialog::onUpdateAvailable(const CAutoUpdaterGithub::ChangeLog& changelog)
 {
 	if (!changelog.empty())
 	{
 		ui->stackedWidget->setCurrentIndex(1);
-		for (const auto& changelogItem: changelog)
-			ui->changeLogViewer->append("<b>" % changelogItem.versionString % "</b>" % '\n' % changelogItem.versionChanges % "<p></p>");
+		for (const auto& changelogItem : changelog) {
+			// modified text plain formatter tags to html tags.
+			auto versionChanges = changelogItem.versionChanges;
+			versionChanges.replace("\r\n", "<br />");
+			versionChanges.replace("\n", "<br />");
+			versionChanges.replace("\r", "<br />");
+
+			ui->changeLogViewer->append("<b>" % changelogItem.versionString % "</b>" % "<br />" % versionChanges % "<p></p>");
+		}
 
 		_latestUpdateUrl = changelog.front().versionUpdateUrl;
+		_latestUpdateFilename = changelog.front().versionUpdateFilename;
+
 		show();
 	}
 	else
