@@ -4,7 +4,6 @@
 *.pdb
 *.Debug
 *.Release
-*.vc*proj
 *.filters
 *.user
 *.orig
