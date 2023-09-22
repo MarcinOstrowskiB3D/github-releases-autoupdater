@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QStringBuilder>
 #include <qthread.h>
+#include <qtimer.h>
 
 CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, const QString& versionString, const QString fileNameTag, const QString accessToken, bool silentCheck) :
 	QDialog(parent),
@@ -22,6 +23,8 @@ CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, c
 
 	connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 	connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &CUpdaterDialog::applyUpdate);
+	connect(this, &QDialog::finished, _updater, &CAutoUpdaterGithub::cancelDownload);
+
 	ui->buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Install"));
 
 	ui->stackedWidget->setCurrentIndex(0);
@@ -32,9 +35,9 @@ CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, c
 
 	_updater->moveToThread(_updaterThread);
 	_updater->setUpdateStatusListener(this);
-	_updater->checkForUpdates();
-
 	_updaterThread->start();
+
+	QTimer::singleShot(std::chrono::milliseconds(1), _updater, &CAutoUpdaterGithub::checkForUpdates);
 }
 
 CUpdaterDialog::~CUpdaterDialog()

@@ -170,7 +170,7 @@
     <ClCompile Include="src\updateinstaller_win.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\cautoupdatergithub.h" />
+    <QtMoc Include="src\cautoupdatergithub.h" />
     <ClInclude Include="src\updaterUI\cupdaterdialog.h" />
     <ClInclude Include="src\updateinstaller.hpp" />
   </ItemGroup>
