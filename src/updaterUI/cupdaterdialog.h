@@ -38,6 +38,7 @@ private:
 
 	QString _latestUpdateUrl;
 	QString _latestUpdateFilename;
-	CAutoUpdaterGithub _updater;
+	CAutoUpdaterGithub* _updater = nullptr;
+	QThread* _updaterThread = nullptr;
 };
 

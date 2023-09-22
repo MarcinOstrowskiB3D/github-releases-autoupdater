@@ -8,6 +8,9 @@
 #include <QNetworkRequest>
 #include <qjsonarray.h>
 
+#include <qthread.h>
+#include <qtimer.h>
+
 #include <assert.h>
 #include <utility>
 
@@ -20,12 +23,14 @@ static const auto naturalSortQstringComparator = [](const QString& l, const QStr
 	return collator.compare(qToStringViewIgnoringNull(l), qToStringViewIgnoringNull(r)) < 0;
 };
 
-CAutoUpdaterGithub::CAutoUpdaterGithub(QString githubRepositoryName, QString currentVersionString, QString fileNameTag, QString accessToken, const std::function<bool (const QString&, const QString&)>& versionStringComparatorLessThan) :
+CAutoUpdaterGithub::CAutoUpdaterGithub(QObject* parent, QString githubRepositoryName, QString currentVersionString, QString fileNameTag, QString accessToken, const std::function<bool (const QString&, const QString&)>& versionStringComparatorLessThan) :
+	QObject(parent),
 	_repoName(std::move(githubRepositoryName)),
 	_currentVersionString(std::move(currentVersionString)),
 	_fileNameTag(std::move(fileNameTag)),
 	_accessToken(accessToken),
-	_lessThanVersionStringComparator(versionStringComparatorLessThan ? versionStringComparatorLessThan : naturalSortQstringComparator)
+	_lessThanVersionStringComparator(versionStringComparatorLessThan ? versionStringComparatorLessThan : naturalSortQstringComparator),
+	_networkManager(new QNetworkAccessManager(this))
 {
 	assert(_repoName.count(QChar('/')) == 1);
 	assert(!_currentVersionString.isEmpty());
@@ -47,7 +52,7 @@ void CAutoUpdaterGithub::checkForUpdates() {
 		request.setRawHeader("Authorization", tokenValue.toUtf8());
 	}
 	
-	QNetworkReply * reply = _networkManager.get(request);
+	QNetworkReply * reply = _networkManager->get(request);
 	if (!reply)
 	{
 		if (_listener)
@@ -55,7 +60,7 @@ void CAutoUpdaterGithub::checkForUpdates() {
 		return;
 	}
 
-	connect(reply, &QNetworkReply::finished, this, &CAutoUpdaterGithub::updateCheckRequestFinished, Qt::UniqueConnection);
+	connect(reply, &QNetworkReply::finished, this, &CAutoUpdaterGithub::updateCheckRequestFinished);
 }
 
 void CAutoUpdaterGithub::downloadAndInstallUpdate(const QString& updateUrl, const QString& filename)
@@ -82,7 +87,7 @@ void CAutoUpdaterGithub::downloadAndInstallUpdate(const QString& updateUrl, cons
 	request.setSslConfiguration(QSslConfiguration::defaultConfiguration()); // HTTPS
 	request.setMaximumRedirectsAllowed(5);
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-	QNetworkReply * reply = _networkManager.get(request);
+	QNetworkReply * reply = _networkManager->get(request);
 	if (!reply)
 	{
 		if (_listener)
@@ -101,27 +106,27 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 	if (!reply)
 		return;
 
-	reply->deleteLater();
+	QSharedPointer<QNetworkReply> replyPtr {reply, & QNetworkReply::deleteLater};
 
-	if (reply->error() != QNetworkReply::NoError)
+	if (replyPtr->error() != QNetworkReply::NoError)
 	{
 		if (_listener)
-			_listener->onUpdateError(reply->errorString());
-
+			_listener->onUpdateError(replyPtr->errorString());
 		return;
 	}
 
-	if (reply->bytesAvailable() <= 0)
+	if (replyPtr->bytesAvailable() <= 0)
 	{
 		if (_listener)
 			_listener->onUpdateError("No data downloaded.");
+
 		return;
 	}
 
 	ChangeLog changelog;
 
 	QJsonParseError jsonError;
-	const QJsonDocument jsonDocument = QJsonDocument::fromJson(reply->readAll(),&jsonError);
+	const QJsonDocument jsonDocument = QJsonDocument::fromJson(replyPtr->readAll(),&jsonError);
 	if (jsonError.error != QJsonParseError::NoError) {
 		if (_listener)
 			_listener->onUpdateError("Failed to parse json data");
@@ -183,8 +188,6 @@ void CAutoUpdaterGithub::updateCheckRequestFinished()
 			break;
 		}
 
-		//QString releaseUrl = object["html_url"].toString(); // Fallback incase there is no download link available
-
 		if (updateVersion.startsWith(QStringLiteral(".v"))) {
 			updateVersion = updateVersion.remove(0, 2);
 		}
@@ -233,12 +236,12 @@ void CAutoUpdaterGithub::updateDownloaded()
 		return;
 	}
 
-	reply->deleteLater();
+	QSharedPointer<QNetworkReply> replyPtr {reply, & QNetworkReply::deleteLater};
 
-	if (reply->error() != QNetworkReply::NoError) 
+	if (replyPtr->error() != QNetworkReply::NoError)
 	{
 		if (_listener)
-			_listener->onUpdateError(reply->errorString());
+			_listener->onUpdateError(replyPtr->errorString());
 
 		return;
 	}

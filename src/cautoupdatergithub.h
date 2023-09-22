@@ -41,7 +41,8 @@ public:
 
 public:
 	// If the string comparison functior is not supplied, case-insensitive natural sorting is used (using QCollator)
-	CAutoUpdaterGithub(QString githubRepositoryName, // Name of the repo, e. g. VioletGiraffe/github-releases-autoupdater
+	CAutoUpdaterGithub(QObject* parent,
+					   QString githubRepositoryName, // Name of the repo, e. g. VioletGiraffe/github-releases-autoupdater
 					   QString currentVersionString,
 					   QString fileNameTag = "", // Name of the file, e. g. Banach3DScanner-Installer -> Banach3DScanner-Installer.exe
 					   QString accessToken = "",
@@ -72,6 +73,6 @@ private:
 
 	UpdateStatusListener* _listener = nullptr;
 
-	QNetworkAccessManager _networkManager;
+	QNetworkAccessManager* _networkManager;
 };
 
