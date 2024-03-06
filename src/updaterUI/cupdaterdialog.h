@@ -19,7 +19,7 @@ class CUpdaterDialog final : public QDialog,
           githubRepoName,  // Name of the repo, e. g.
                            // VioletGiraffe/github-releases-autoupdater
       const QString& versionString, const QString fileNameTag = "",
-      const QString accessToken = "", bool silentCheck = false);
+      const QString accessToken = "", bool allowPreRelease = false, bool silentCheck = false);
   ~CUpdaterDialog() override;
 
  private:

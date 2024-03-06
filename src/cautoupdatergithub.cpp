@@ -28,10 +28,11 @@ static const auto naturalSortQstringComparator = [](const QString& l,
 
 CAutoUpdaterGithub::CAutoUpdaterGithub(
     QObject* parent, QString githubRepositoryName, QString currentVersionString,
-    QString fileNameTag, QString accessToken,
+    QString fileNameTag, QString accessToken, bool allowPreRelease,
     const std::function<bool(const QString&, const QString&)>&
         versionStringComparatorLessThan)
     : QObject(parent),
+      _allowPreRelease(allowPreRelease),
       _repoName(std::move(githubRepositoryName)),
       _currentVersionString(std::move(currentVersionString)),
       _fileNameTag(std::move(fileNameTag)),
@@ -168,6 +169,16 @@ void CAutoUpdaterGithub::updateCheckRequestFinished() {
     for (const auto& asset : assetsJsonArray) {
       // Get binaries with only valid extension.
       auto assetObject = asset.toObject();
+
+      auto draft = object["draft"].toBool();
+      if (draft) {
+        continue;
+      }
+
+      auto prerelease = object["prerelease"].toBool();
+      if (!_allowPreRelease || !prerelease) {
+        continue;
+      }
 
       auto browserUrl = assetObject["browser_download_url"].toString();
       filename = QUrl(browserUrl).fileName();

@@ -9,11 +9,16 @@
 #include <qthread.h>
 #include <qtimer.h>
 
-CUpdaterDialog::CUpdaterDialog(QWidget *parent, const QString& githubRepoName, const QString& versionString, const QString fileNameTag, const QString accessToken, bool silentCheck) :
+CUpdaterDialog::CUpdaterDialog(QWidget* parent, const QString& githubRepoName,
+                               const QString& versionString,
+                               const QString fileNameTag,
+                               const QString accessToken, bool allowPreRelease,
+                               bool silentCheck)
+    :
 	QDialog(parent),
 	ui(new Ui::CUpdaterDialog),
 	_silent(silentCheck),
-	_updater(new CAutoUpdaterGithub(nullptr, githubRepoName, versionString, fileNameTag, accessToken)),
+	_updater(new CAutoUpdaterGithub(nullptr, githubRepoName, versionString, fileNameTag, accessToken, allowPreRelease)),
 	_updaterThread(new QThread)
 {
 	ui->setupUi(this);

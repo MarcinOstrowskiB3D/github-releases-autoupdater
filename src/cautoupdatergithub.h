@@ -50,6 +50,7 @@ class CAutoUpdaterGithub final : public QObject {
           "",  // Name of the file, e. g. Banach3DScanner-Installer ->
                // Banach3DScanner-Installer.exe
       QString accessToken = "",
+      bool allowPreRelease = false,
       const std::function<bool(const QString&, const QString&)>&
           versionStringComparatorLessThan = {});
 
@@ -71,6 +72,7 @@ class CAutoUpdaterGithub final : public QObject {
 
  private:
   QFile _downloadedBinaryFile;
+  const bool _allowPreRelease;
   const QString _fileNameTag;
   const QString _accessToken;
   const QString _repoName;
