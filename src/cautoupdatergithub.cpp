@@ -176,7 +176,7 @@ void CAutoUpdaterGithub::updateCheckRequestFinished() {
       }
 
       auto prerelease = object["prerelease"].toBool();
-      if (!_allowPreRelease || !prerelease) {
+      if (!_allowPreRelease && prerelease) {
         continue;
       }
 
