@@ -167,42 +167,42 @@ void CAutoUpdaterGithub::updateCheckRequestFinished() {
     QString filename;
 
     for (const auto& asset : assetsJsonArray) {
-      // Get binaries with only valid extension.
-      auto assetObject = asset.toObject();
+        // Get binaries with only valid extension.
+        auto assetObject = asset.toObject();
 
-      auto draft = object["draft"].toBool();
-      if (draft) {
-        continue;
-      }
+        auto draft = object["draft"].toBool();
+        if (draft) {
+            continue;
+        }
 
-      auto prerelease = object["prerelease"].toBool();
-      if (!_allowPreRelease && prerelease) {
-        continue;
-      }
+        auto prerelease = object["prerelease"].toBool();
+        if (!_allowPreRelease && prerelease) {
+            continue;
+        }
 
-      auto browserUrl = assetObject["browser_download_url"].toString();
-      filename = QUrl(browserUrl).fileName();
+        auto browserUrl = assetObject["browser_download_url"].toString();
+        filename = QUrl(browserUrl).fileName();
 
-      if (filename.indexOf(UPDATE_FILE_EXTENSION) < 0) {
-        continue;
-      }
+        if (filename.indexOf(UPDATE_FILE_EXTENSION) < 0) {
+            continue;
+        }
 
-      // Get binaries with only valid filename.
-      if (!_fileNameTag.isEmpty() && filename.indexOf(_fileNameTag) < 0) {
-        continue;
-      }
+        // Get binaries with only valid filename.
+        if (!_fileNameTag.isEmpty() && filename.indexOf(_fileNameTag) < 0) {
+            continue;
+        }
 
-      // Generate url link:
-      const auto assetIdUrl = QVariant(assetObject["id"].toInt()).toString();
+        // Generate url link:
+        const auto assetIdUrl = QVariant(assetObject["id"].toInt()).toString();
 
-      url = QString(RepoUrl.data())
-                .append(_repoName)
-                .append("/")
-                .append("assets")
-                .append("/")
-                .append(assetIdUrl);
+        url = QString(RepoUrl.data())
+            .append(_repoName)
+            .append("/")
+            .append("assets")
+            .append("/")
+            .append(assetIdUrl);
 
-      break;
+        break;
     }
 
     if (updateVersion.startsWith(QStringLiteral(".v"))) {
@@ -240,6 +240,8 @@ void CAutoUpdaterGithub::updateCheckRequestFinished() {
   } else {
     parseReleaseJsonObject(jsonDocument.object());
   }
+
+  std::sort(changelog.begin(), changelog.end(), std::greater<VersionEntry>());
 
   if (_listener) _listener->onUpdateAvailable(changelog);
 }

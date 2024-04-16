@@ -5,7 +5,9 @@
 #include <QNetworkAccessManager>
 #include <QString>
 #include <functional>
+#include <qcollator.h>
 #include <vector>
+#include <qversionnumber.h>
 
 #if defined _WIN32
 #define UPDATE_FILE_EXTENSION QLatin1String(".exe")
@@ -24,6 +26,14 @@ class CAutoUpdaterGithub final : public QObject {
     QString versionChanges;
     QString versionUpdateUrl;
     QString versionUpdateFilename;
+
+    inline bool operator > (const VersionEntry& str) const
+    {
+        auto currentVersion = QVersionNumber::fromString(versionString);
+        auto otherVersion = QVersionNumber::fromString(str.versionString);
+
+        return currentVersion > otherVersion;
+    }
   };
 
   using ChangeLog = std::vector<VersionEntry>;
