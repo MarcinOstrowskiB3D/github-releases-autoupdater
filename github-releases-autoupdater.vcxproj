@@ -123,6 +123,7 @@
     </QtUic>
   </ItemGroup>
   <ItemGroup>
+    <QtTranslation Include="cupdaterdialog_de.ts" />
     <QtTranslation Include="cupdaterdialog_pl.ts" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
